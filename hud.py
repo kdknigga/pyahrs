@@ -56,7 +56,8 @@ class Vehicle(object):
             self.set_orientation(roll=r, pitch=p)
 
         elif self.data_source == "network":
-            r = self.network_source['requests_session'].get("http://{0}/getSituation".format(self.network_source['host']), timeout=2)
+            url = "http://{0}/getSituation".format(self.network_source['host'])
+            r = self.network_source['requests_session'].get(url, timeout=2)
             self.set_orientation(roll=r.json()['AHRSRoll'], pitch=r.json()['AHRSPitch'])
 
         else:
