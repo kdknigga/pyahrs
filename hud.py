@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import os, sys, random
-import pygame
+import argparse, pygame
 
 class Vehicle(object):
     def __init__(self, data_source="random", network_source=None):
@@ -63,12 +63,16 @@ class Vehicle(object):
         else:
             raise ValueError
 
-def display_init():
+def debug_print(debug, string, level=1):
+    if debug >= level:
+        print string
+
+def display_init(debug):
     pygame.init()
     disp_no = os.getenv('DISPLAY')
     if disp_no:
     #if False:
-        #print "I'm running under X display = {0}".format(disp_no)
+        debug_print(debug, "I'm running under X display = {0}".format(disp_no))
         size = 320, 240
         screen = pygame.display.set_mode(size)
     else:
@@ -81,7 +85,7 @@ def display_init():
             try:
                 pygame.display.init()
             except pygame.error:
-                print 'Driver: {0} failed.'.format(driver)
+                debug_print(debug, 'Driver: {0} failed.'.format(driver))
                 continue
 
             found = True
@@ -114,7 +118,18 @@ def get_line_coords(pitch, screen_width, screen_height, ahrs_center):
     return [[start_x, y], [end_x, y]]
 
 def main():
-    screen, screen_size = display_init()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--datasource", help="Where the orientation information comes from (default: %(default)s)",
+                        choices=["random", "network", "manual"], default="random")
+    parser.add_argument("-n", "--networkhost", help="The name or IP address of the network host used as the data source")
+    parser.add_argument("-f", "--maxframerate", help="The maximum number of frames per second attempted (default: %(default)s)", type=int, default=20)
+    parser.add_argument("-D", "--debug", help="Enable verbose output for debugging purposes", action="count")
+    args = parser.parse_args()
+
+    if args.datasource == "network" and args.networkhost is None:
+        parser.error("--networkhost is required when --datasource is set to 'network'")
+
+    screen, screen_size = display_init(args.debug)
     width, height = screen_size
     pygame.mouse.set_visible(False)
 
@@ -122,7 +137,7 @@ def main():
 
     font = pygame.font.SysFont(None, int(height/20))
 
-    v = Vehicle(data_source="network", network_source={'host': '192.168.107.188'})
+    v = Vehicle(data_source=args.datasource, network_source={'host': args.networkhost})
 
     ahrs_bg = pygame.Surface((width*2, height*2))
     ahrs_bg_width = ahrs_bg.get_width()
@@ -144,7 +159,7 @@ def main():
     clock = pygame.time.Clock()
 
     while not done:
-        clock.tick(240)
+        clock.tick(args.maxframerate)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 done = True
@@ -153,9 +168,9 @@ def main():
         roll = o['roll']
         pitch = o['pitch']
 
-        print "Roll:  {:.1f}".format(roll)
-        print "Pitch: {:.1f}".format(pitch)
-        print ""
+        debug_print(args.debug, "Roll:  {:.1f}".format(roll))
+        debug_print(args.debug, "Pitch: {:.1f}".format(pitch))
+        debug_print(args.debug, "")
 
         pitch_offset = height / 60 * pitch
 
