@@ -4,13 +4,21 @@ import os, sys, random
 import pygame
 
 class Vehicle(object):
-    def __init__(self, data_source="random"):
+    def __init__(self, data_source="random", network_source=None):
         self.data_source = data_source
+        self.network_source = network_source
         self.roll = 0.0
         self.pitch = 0.0
         self.yaw = 0.0
         self.alt = 0
         self.airspeed = 0
+
+        if self.data_source == "network":
+            if not self.network_source:
+                raise TypeError
+
+            import requests
+            self.network_source['requests_session'] = requests.Session()
 
     def get_orientation(self):
         self.update_orientation()
@@ -46,6 +54,10 @@ class Vehicle(object):
             r = float(raw_input('Roll? '))
             p = float(raw_input('Pitch? '))
             self.set_orientation(roll=r, pitch=p)
+
+        elif self.data_source == "network":
+            r = self.network_source['requests_session'].get("http://{0}/getSituation".format(self.network_source['host']), timeout=2)
+            self.set_orientation(roll=r.json()['AHRSRoll'], pitch=r.json()['AHRSPitch'])
 
         else:
             raise ValueError
@@ -109,7 +121,7 @@ def main():
 
     font = pygame.font.SysFont(None, int(height/20))
 
-    v = Vehicle(data_source="random")
+    v = Vehicle(data_source="network", network_source={'host': '192.168.107.188'})
 
     ahrs_bg = pygame.Surface((width*2, height*2))
     ahrs_bg_width = ahrs_bg.get_width()
@@ -131,7 +143,7 @@ def main():
     clock = pygame.time.Clock()
 
     while not done:
-        clock.tick(20)
+        clock.tick(240)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 done = True
