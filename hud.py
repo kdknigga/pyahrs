@@ -73,7 +73,8 @@ def display_init(debug):
     if disp_no:
     #if False:
         debug_print(debug, "I'm running under X display = {0}".format(disp_no))
-        size = 320, 240
+        size = 640, 480
+        #size = 320, 240
         screen = pygame.display.set_mode(size)
     else:
         drivers = ['directfb', 'fbcon', 'svgalib']
@@ -110,7 +111,6 @@ def get_line_coords(pitch, screen_width, screen_height, ahrs_center):
     ahrs_center_x, ahrs_center_y = ahrs_center
 
     px_per_deg_y = screen_height / 60
-
     start_x = ahrs_center_x - (length / 2)
     end_x = ahrs_center_x + (length / 2)
     y = (px_per_deg_y * -pitch) + ahrs_center_y
@@ -139,13 +139,23 @@ def main():
 
     v = Vehicle(data_source=args.datasource, network_source={'host': args.networkhost})
 
-    ahrs_bg = pygame.Surface((width*2, height*2))
+    ahrs_bg = pygame.Surface((width, height*3))
     ahrs_bg_width = ahrs_bg.get_width()
     ahrs_bg_height = ahrs_bg.get_height()
     ahrs_bg_center = (ahrs_bg_width/2, ahrs_bg_height/2)
 
-    for l in range(-60, 60, 5):
+    # range isn't inclusive of the stop value, so if stop is 60 then there's no line make
+    # for 60
+    for l in range(-60, 61, 5):
         line_coords = get_line_coords(l, width, height, ahrs_bg_center)
+
+        if abs(l)>45:
+            if l%5 == 0 and l%10 != 0:
+                continue
+
+        debug_print(args.debug, "Deg: {0}".format(l), 2)
+        debug_print(args.debug, "Line Coords: {0}".format(line_coords), 2)
+        debug_print(args.debug, "", 2)
         pygame.draw.lines(ahrs_bg, WHITE, False, line_coords, 2)
 
         if l != 0 and l%10 == 0:
