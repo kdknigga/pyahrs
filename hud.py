@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, sys, random
+import math, os, sys, random
 import argparse, pygame
 
 class Vehicle(object):
@@ -100,22 +100,30 @@ def display_init(debug):
 
     return screen, size
 
-def get_line_coords(pitch, screen_width, screen_height, ahrs_center):
-    if pitch == 0:
+def get_line_coords(screen_width, screen_height, ahrs_center, pitch=0, roll=0, deg_ref=0):
+    if deg_ref == 0:
         length = screen_width*.6
-    elif (pitch%10) == 0:
+    elif (deg_ref%10) == 0:
         length = screen_width*.4
-    elif (pitch%5) == 0:
+    elif (deg_ref%5) == 0:
         length = screen_width*.2
 
     ahrs_center_x, ahrs_center_y = ahrs_center
-
     px_per_deg_y = screen_height / 60
-    start_x = ahrs_center_x - (length / 2)
-    end_x = ahrs_center_x + (length / 2)
-    y = (px_per_deg_y * -pitch) + ahrs_center_y
+    pitch_offset = px_per_deg_y * (-pitch + deg_ref)
 
-    return [[start_x, y], [end_x, y]]
+    center_x = ahrs_center_x - (pitch_offset * math.cos(math.radians(90 - roll)))
+    center_y = ahrs_center_y - (pitch_offset * math.sin(math.radians(90 - roll)))
+
+    x_len = length * math.cos(math.radians(roll))
+    y_len = length * math.sin(math.radians(roll))
+
+    start_x = center_x - (x_len / 2)
+    end_x = center_x + (x_len / 2)
+    start_y = center_y + (y_len / 2)
+    end_y = center_y - (y_len / 2)
+
+    return [[start_x, start_y], [end_x, end_y]]
 
 def main():
     parser = argparse.ArgumentParser()
@@ -134,36 +142,17 @@ def main():
     pygame.mouse.set_visible(False)
 
     WHITE = (255, 255, 255)
+    BLACK = (0, 0, 0)
 
     font = pygame.font.SysFont(None, int(height/20))
 
     v = Vehicle(data_source=args.datasource, network_source={'host': args.networkhost})
 
-    ahrs_bg = pygame.Surface((width, height*3))
+    ahrs_bg = pygame.Surface((width*2, height*2))
+    ahrs = ahrs_bg
     ahrs_bg_width = ahrs_bg.get_width()
     ahrs_bg_height = ahrs_bg.get_height()
     ahrs_bg_center = (ahrs_bg_width/2, ahrs_bg_height/2)
-
-    # range isn't inclusive of the stop value, so if stop is 60 then there's no line make
-    # for 60
-    for l in range(-60, 61, 5):
-        line_coords = get_line_coords(l, width, height, ahrs_bg_center)
-
-        if abs(l)>45:
-            if l%5 == 0 and l%10 != 0:
-                continue
-
-        debug_print(args.debug, "Deg: {0}".format(l), 2)
-        debug_print(args.debug, "Line Coords: {0}".format(line_coords), 2)
-        debug_print(args.debug, "", 2)
-        pygame.draw.lines(ahrs_bg, WHITE, False, line_coords, 2)
-
-        if l != 0 and l%10 == 0:
-            text = font.render(str(l), False, WHITE)
-            text_width, text_height = text.get_size()
-            left = int(line_coords[0][0]) - (text_width + int(width/100))
-            top = int(line_coords[0][1]) - text_height / 2
-            ahrs_bg.blit(text, (left, top))
 
     done = False
     clock = pygame.time.Clock()
@@ -182,13 +171,28 @@ def main():
         debug_print(args.debug, "Pitch: {:.1f}".format(pitch))
         debug_print(args.debug, "")
 
-        pitch_offset = height / 60 * pitch
+        ahrs.fill(BLACK)
 
-        ahrs = ahrs_bg.copy()
+        # range isn't inclusive of the stop value, so if stop is 60 then there's no line make
+        # for 60
+        for l in range(-60, 61, 5):
+            line_coords = get_line_coords(width, height, ahrs_bg_center, pitch=pitch, roll=roll, deg_ref=l)
 
-        ahrs.scroll(dy=int(pitch_offset))
+            if abs(l)>45:
+                if l%5 == 0 and l%10 != 0:
+                    continue
 
-        ahrs = pygame.transform.rotate(ahrs, roll)
+            debug_print(args.debug, "Deg: {0}".format(l), 2)
+            debug_print(args.debug, "Line Coords: {0}".format(line_coords), 2)
+            debug_print(args.debug, "", 2)
+            pygame.draw.lines(ahrs_bg, WHITE, False, line_coords, 2)
+
+            if l != 0 and l%10 == 0:
+                text = font.render(str(l), False, WHITE)
+                text_width, text_height = text.get_size()
+                left = int(line_coords[0][0]) - (text_width + int(width/100))
+                top = int(line_coords[0][1]) - text_height / 2
+                ahrs_bg.blit(text, (left, top))
 
         top_left = (-(ahrs.get_width() - width)/2, -(ahrs.get_height() - height)/2)
         screen.blit(ahrs, top_left)
